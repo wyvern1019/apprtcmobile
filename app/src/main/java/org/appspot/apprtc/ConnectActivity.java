@@ -23,6 +23,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.ContextMenu;
 import android.view.KeyEvent;
@@ -42,6 +43,9 @@ import java.util.ArrayList;
 import java.util.Random;
 import org.json.JSONArray;
 import org.json.JSONException;
+
+import static android.Manifest.permission.CHANGE_NETWORK_STATE;
+import static android.Manifest.permission.WRITE_SETTINGS;
 
 /**
  * Handles the initial setup where the user selects which room to join.
@@ -215,21 +219,34 @@ public class ConnectActivity extends Activity {
       if (missingPermissions.length != 0) {
         // User didn't grant all the permissions. Warn that the application might not work
         // correctly.
-        new AlertDialog.Builder(this)
-            .setMessage(R.string.missing_permissions_try_again)
-            .setPositiveButton(R.string.yes,
-                (dialog, id) -> {
-                  // User wants to try giving the permissions again.
-                  dialog.cancel();
-                  requestPermissions();
-                })
-            .setNegativeButton(R.string.no,
-                (dialog, id) -> {
-                  // User doesn't want to give the permissions.
-                  dialog.cancel();
-                  onPermissionsGranted();
-                })
-            .show();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && missingPermissions.length == 1
+                && missingPermissions[0].equals(CHANGE_NETWORK_STATE)) {
+          if (!Settings.System.canWrite(this)) {
+            Intent goToSettings = null;
+            goToSettings = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS);
+            goToSettings.setData(Uri.parse("package:" + ConnectActivity.this.getPackageName()));
+            startActivity(goToSettings);
+          } else {
+            onPermissionsGranted();
+          }
+        } else {
+          new AlertDialog.Builder(this)
+                  .setMessage(R.string.missing_permissions_try_again)
+                  .setPositiveButton(R.string.yes,
+                          (dialog, id) -> {
+                            // User wants to try giving the permissions again.
+                            dialog.cancel();
+                            requestPermissions();
+                          })
+                  .setNegativeButton(R.string.no,
+                          (dialog, id) -> {
+                            // User doesn't want to give the permissions.
+                            dialog.cancel();
+                            onPermissionsGranted();
+                          })
+                  .show();
+        }
       } else {
         // All permissions granted.
         onPermissionsGranted();
